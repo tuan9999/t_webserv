@@ -7,34 +7,29 @@
 #include <sys/socket.h> 
 #include <stdlib.h> 
 #include <netinet/in.h> 
-#include <string.h> 
-#define PORT 8080 
+#include <string.h>
+#include "requestParser.hpp"
+#define PORT 5000 
 int main(int argc, char const *argv[]) 
 { 
-    int server_fd, new_socket, valread; 
-    struct sockaddr_in address; 
-    int opt = 1; 
-    int addrlen = sizeof(address); 
-    char buffer[1024] = {0}; 
-    char *hello = "Hello from server";
+    int					server_fd, new_socket, valread; 
+    struct sockaddr_in	address; 
+    int					opt = 1; 
+    int					addrlen = sizeof(address); 
+    char				buffer[1024] = {0}; 
+    char				*hello = "Hello from server";
 
-	std::string header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
-	std::string headerfinish = "\r\n\r\n";
-	std::string	message;
-	char line[32];
-	int ret = 0;
-	char *ret_file = (char *)malloc(sizeof(char) * 100);
-	// int		pagefd = open("test.html", O_RDONLY);
-	// while (ret = read(pagefd, line, 32) > 0) {
-	// 	message += line;
-	// 	memset(line, 0, 32);
-	// }
+	std::string			header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
+	std::string			headerfinish = "\r\n\r\n";
+	std::string			message;
+	char				line[32];
+	int					ret = 0;
+	std::string			ret_file;
 
-	// header = header + std::to_string(message.length()) + headerfinish + message;
-	// char len = header.length();
+	RequestParser		request;
        
     // Creating socket file descriptor 
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) <= 0) 
+    if ((server_fd = socket(PF_INET, SOCK_STREAM, 0)) <= 0) 
     { 
         perror("socket failed"); 
         exit(EXIT_FAILURE); 
@@ -56,7 +51,7 @@ int main(int argc, char const *argv[])
         perror("bind failed"); 
         exit(EXIT_FAILURE); 
     } 
-    if (listen(server_fd, 30) < 0) 
+    if (listen(server_fd, 10) < 0) 
     { 
         perror("listen"); 
         exit(EXIT_FAILURE); 
@@ -72,16 +67,12 @@ int main(int argc, char const *argv[])
 		if (pid == -1)
 			exit(0);
 		if (pid == 0) {
-			valread = read( new_socket , buffer, 1024); 
-			printf("%s\n",buffer );
-			int i = 0;
-			int j = 0;
-			while(buffer[i] != '/')
-				i++;
-			i++;
-			while(buffer[i] != ' ')
-				ret_file[j++] = buffer[i++];
-			int	pagefd = open(ret_file, O_RDONLY);
+			valread = recv( new_socket , buffer, 1023, 0 ); 
+			//printf("BUFF = %s\n",buffer );
+			request.parseRequest(std::string(buffer));
+
+			ret_file = ((request.getRequest()).uri).substr(1);
+			int	pagefd = open(ret_file.c_str(), O_RDONLY);
 			while (ret = read(pagefd, line, 32) > 0) {
 				message += line;
 				memset(line, 0, 32);
