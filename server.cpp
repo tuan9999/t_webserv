@@ -9,15 +9,17 @@
 #include <netinet/in.h> 
 #include <string.h>
 #include "requestParser.hpp"
+
 #define PORT 5000 
+
 int main(int argc, char const *argv[]) 
 { 
-    int					server_fd, new_socket, valread; 
-    struct sockaddr_in	address; 
+    int					server_fd, fdmax, new_socket, valread; 
+    struct sockaddr_in	address;
+    fd_set				readfds, master;
     int					opt = 1; 
     int					addrlen = sizeof(address); 
     char				buffer[1024] = {0}; 
-    char				*hello = "Hello from server";
 
 	std::string			header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
 	std::string			headerfinish = "\r\n\r\n";
@@ -27,24 +29,31 @@ int main(int argc, char const *argv[])
 	std::string			ret_file;
 
 	RequestParser		request;
+
+	FD_ZERO(&master);
+	FD_ZERO(&readfds);
        
-    // Creating socket file descriptor 
-    if ((server_fd = socket(PF_INET, SOCK_STREAM, 0)) <= 0) 
+    memset(&address, 0, sizeof address);
+    address.sin_family = AF_INET; 
+    address.sin_addr.s_addr = INADDR_ANY; 
+    address.sin_port = htons( PORT ); 
+       
+    // Creating socket file descriptor
+    server_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) 
     { 
         perror("socket failed"); 
         exit(EXIT_FAILURE); 
     } 
     std::cout << "server_fd = " << server_fd << std::endl;
+
     // Forcefully attaching socket to the port 8080 
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) 
     { 
         perror("setsockopt"); 
         exit(EXIT_FAILURE); 
-    } 
-    address.sin_family = AF_INET; 
-    address.sin_addr.s_addr = INADDR_ANY; 
-    address.sin_port = htons( PORT ); 
-       
+    }
+
     // Forcefully attaching socket to the port 8080 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) 
     { 
@@ -56,30 +65,66 @@ int main(int argc, char const *argv[])
         perror("listen"); 
         exit(EXIT_FAILURE); 
     } 
-    while ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))) 
+	FD_SET(server_fd, &master);
+	fdmax = server_fd;
+    while (1) 
     {
-		if (new_socket < 0)
+        readfds = master;
+		if ((select(fdmax + 1, &readfds, NULL, NULL, NULL)) == -1)
+        {
+			perror("Select failed");
+            exit(EXIT_FAILURE);
+        }
+		for (int i = 0; i <= fdmax; i++)
 		{
-			perror("accept"); 
-			exit(EXIT_FAILURE); 
-		}
-		int pid = fork();
-		if (pid == -1)
-			exit(0);
-		if (pid == 0) {
-			valread = recv( new_socket , buffer, 1023, 0 ); 
-			//printf("BUFF = %s\n",buffer );
-			request.parseRequest(std::string(buffer));
+			if (FD_ISSET(i, &readfds))
+            {
+				if (i == server_fd)
+				{
+                    addrlen = sizeof(address); 
+					new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
+                    if (new_socket == -1)
+                    {
+                        perror("accept");
+                    }
+                    else
+                    {
+                        FD_SET(new_socket, &master);
+                        if (new_socket > fdmax)
+                            fdmax = new_socket;
+                    }
 
-			ret_file = ((request.getRequest()).uri).substr(1);
-			int	pagefd = open(ret_file.c_str(), O_RDONLY);
-			while (ret = read(pagefd, line, 32) > 0) {
-				message += line;
-				memset(line, 0, 32);
+				}
+                else
+                {
+                    valread = recv( i , buffer, 1023, 0 );
+                    if (valread <= 0)
+                    {
+                        if (valread == 0)
+                            std::cout << "selectserver: socket " << valread << " hung up" << std::endl;
+                        else
+                            perror("recv");
+                        close(i);
+                        FD_CLR(i, &master);
+                    }
+                    else
+                    {
+                        request.parseRequest(std::string(buffer));
+
+                        ret_file = ((request.getRequest()).uri).substr(1);
+                        int	pagefd = open(ret_file.c_str(), O_RDONLY);
+                        while ((ret = read(pagefd, line, 32)) > 0) {
+                            message += line;
+                            memset(line, 0, 32);
+                        }
+                        header = header + std::to_string(message.length()) + headerfinish + message;
+                        if ((send(i , header.c_str() , header.length() , 0 )) == -1)
+                            perror("send");
+                        close(i);
+                        FD_CLR(i, &master);
+                    }
+                }
 			}
-			header = header + std::to_string(message.length()) + headerfinish + message;
-			char len = header.length();
-			send(new_socket , header.c_str() , len , 0 ); 
 		}
     }
 	close(server_fd);
