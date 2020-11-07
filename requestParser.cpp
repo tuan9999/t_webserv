@@ -6,7 +6,7 @@
 /*   By: tuperera <tuperera@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2020/10/22 11:17:58 by tuperera      #+#    #+#                 */
-/*   Updated: 2020/10/23 13:16:26 by tuperera      ########   odam.nl         */
+/*   Updated: 2020/10/27 11:41:24 by tuperera      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,7 +96,7 @@ void			RequestParser::parseRequest(std::string request_msg)
 	request_msg = request_msg.substr(pos + 1);
     pos = getHttpVersion(request_msg);
 	request_msg = request_msg.substr(pos + 2);
-    std::cout << _request.uri;
+    // std::cout << _request.uri;
 	
    	// std::cout <<  "request msg == " << request_msg << std::endl;
 

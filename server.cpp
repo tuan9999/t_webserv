@@ -10,7 +10,8 @@
 #include <string.h>
 #include "requestParser.hpp"
 
-#define PORT 5000 
+#define PORT	5000
+#define BUFLEN	1024
 
 int main(int argc, char const *argv[]) 
 { 
@@ -19,25 +20,27 @@ int main(int argc, char const *argv[])
     fd_set				readfds, master;
     int					opt = 1; 
     int					addrlen = sizeof(address); 
-    char				buffer[1024] = {0}; 
+    char				buffer[BUFLEN] = {0}; 
 
 	std::string			header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
+	std::string			header_send;
 	std::string			headerfinish = "\r\n\r\n";
 	std::string			message;
 	char				line[32];
 	int					ret = 0;
 	std::string			ret_file;
+	std::string			request_head;
 
 	RequestParser		request;
 
 	FD_ZERO(&master);
 	FD_ZERO(&readfds);
-       
+
     memset(&address, 0, sizeof address);
     address.sin_family = AF_INET; 
     address.sin_addr.s_addr = INADDR_ANY; 
     address.sin_port = htons( PORT ); 
-       
+
     // Creating socket file descriptor
     server_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) 
@@ -81,6 +84,7 @@ int main(int argc, char const *argv[])
             {
 				if (i == server_fd)
 				{
+					std::cout << "Accepting" << std::endl;
                     addrlen = sizeof(address); 
 					new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
                     if (new_socket == -1)
@@ -92,12 +96,23 @@ int main(int argc, char const *argv[])
                         FD_SET(new_socket, &master);
                         if (new_socket > fdmax)
                             fdmax = new_socket;
+						std::cout << "New client connected" << std::endl;
                     }
 
 				}
                 else
                 {
-                    valread = recv( i , buffer, 1023, 0 );
+					std::cout << "Recieving" << std::endl;
+					request_head = "";
+                    do {
+						valread = recv(i, buffer, BUFLEN - 1, 0);
+						if (valread < 0)
+							perror("recv");
+						request_head.append(buffer, valread);
+						memset(buffer, 0, BUFLEN);
+					} while (valread == BUFLEN - 1);
+					
+					std::cout << "\n----------\n" << request_head << "\n----------\n" << std::endl;
                     if (valread <= 0)
                     {
                         if (valread == 0)
@@ -109,16 +124,18 @@ int main(int argc, char const *argv[])
                     }
                     else
                     {
-                        request.parseRequest(std::string(buffer));
+                        request.parseRequest(request_head);
 
                         ret_file = ((request.getRequest()).uri).substr(1);
                         int	pagefd = open(ret_file.c_str(), O_RDONLY);
+						message = "";
                         while ((ret = read(pagefd, line, 32)) > 0) {
                             message += line;
                             memset(line, 0, 32);
                         }
-                        header = header + std::to_string(message.length()) + headerfinish + message;
-                        if ((send(i , header.c_str() , header.length() , 0 )) == -1)
+                        header_send = header + std::to_string(message.length()) + headerfinish + message;
+						std::cout << "\nHEADER BEGIN----------\n" << header_send << "\n----------HEADER END\n" << std::endl;
+                        if ((send(i , header_send.c_str() , header_send.length() , 0 )) == -1)
                             perror("send");
                         close(i);
                         FD_CLR(i, &master);
