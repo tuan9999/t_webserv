@@ -6,7 +6,7 @@
 /*   By: tuperera <tuperera@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2020/10/22 11:17:58 by tuperera      #+#    #+#                 */
-/*   Updated: 2020/10/27 11:41:24 by tuperera      ########   odam.nl         */
+/*   Updated: 2020/12/10 18:13:29 by tuperera      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -84,10 +84,39 @@ size_t			RequestParser::getHttpVersion(std::string request_msg)
     return (pos_2);
 }
 
+size_t			RequestParser::getHeaders(std::string request_msg)
+{
+	std::string header;
+	std::string header_key;
+	std::string header_val;
+	std::size_t pos;
+	int i = 0;
+	std::cout << request_msg << std::endl;
+	std::cout << "START" << std::endl;
+	while (request_msg.size() > 0)
+	{
+		i++;
+		pos = request_msg.find("\r\n");
+		if (pos != request_msg.find("\r\n\r\n"))
+		{
+			header = request_msg.substr(0, pos + 2);
+			std::cout << "HEADER = " << header << std::endl;
+			header_key = header.substr(0, header.find(":"));
+			std::cout << "header_key = " << header_key << std::endl;
+			header_val = header.substr(header.find(":") + 2, header.find("\r\n"));
+			std::cout << "header_val = " << header_val << std::endl;
+			_request.headers.insert(std::pair<std::string, std::string>(header_key, header_val));
+			request_msg = request_msg.substr(pos+2);
+		}
+		else
+			break ;
+	}
+	return pos;
+}
+
 void			RequestParser::parseRequest(std::string request_msg)
 {
 	size_t		pos;
-
     if (request_msg[0] == ' ')
         throw std::runtime_error("Error: Invalid whitespace.");
     pos = getMethod(request_msg);
@@ -95,9 +124,16 @@ void			RequestParser::parseRequest(std::string request_msg)
     pos = getUri(request_msg);
 	request_msg = request_msg.substr(pos + 1);
     pos = getHttpVersion(request_msg);
-	request_msg = request_msg.substr(pos + 2);
-    // std::cout << _request.uri;
-	
-   	// std::cout <<  "request msg == " << request_msg << std::endl;
+	request_msg = request_msg.substr(pos + 9);
+	pos = getHeaders(request_msg);
+#if DEBUG & DEBUG_PARSE
+	std::map<std::string, std::string>::iterator it;
+	std::cout << "map stuff" << std::endl;
+	for (it = _request.headers.begin(); it != _request.headers.end(); it++){
+		std::cout << it->first << " " << it->second << std::endl;
+	}
+	std::cout << _request.headers["Connection"];
+    std::cout << _request.uri << " " << _request.method << " " << _request.version.first << " " << _request.version.second;
+#endif
 
 }

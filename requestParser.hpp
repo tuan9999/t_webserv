@@ -6,7 +6,7 @@
 /*   By: tuperera <tuperera@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2020/10/22 11:18:02 by tuperera      #+#    #+#                 */
-/*   Updated: 2020/10/22 16:32:36 by tuperera      ########   odam.nl         */
+/*   Updated: 2020/12/10 18:12:53 by tuperera      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,33 +17,13 @@
 # include <exception>
 # include <iostream>
 
-
-enum    eHeaderType {
-    ACCEPT_CHARSET,
-    ACCEPT_LANGUAGE,
-    ALLOW,
-    AUTHORIZATION,
-    CONTENT_LANGUAGE,
-    CONTENT_LENGTH,
-    CONTENT_LOCATION,
-    CONTENT_TYPE,
-    DATE,
-    HOST,
-    LAST_MODIFIED,
-    LOCATION,
-    REFERER,
-    RETRY_AFTER,
-    SERVER,
-    TRANSFER_ENCODING,
-    USER_AGENT,
-    WWW_AUTHENTICATE
-};
+#define DEBUG_PARSE 0
 
 struct  Request {
     std::string							method;
     std::string							uri;
 	std::pair<int, int>					version;
-	std::map<eHeaderType, std::string>	headers;
+	std::map<std::string, std::string>	headers;
 };
 
 class   RequestParser {
@@ -63,6 +43,7 @@ class   RequestParser {
 		size_t			getMethod(std::string request_msg);
 		size_t			getUri(std::string request_msg);
 		size_t			getHttpVersion(std::string request_msg);
+		size_t			getHeaders(std::string request_msg);
 };
 
 #endif
